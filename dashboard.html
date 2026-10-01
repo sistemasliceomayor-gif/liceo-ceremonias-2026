@@ -751,6 +751,26 @@
 // Producción: la dirección del backend está en config.js (API_URL). Esta página no contiene
 // datos de estudiantes ni claves: todo llega del servidor después de iniciar sesión.
 const BACKEND_CONECTADO = true;
+
+// Compatibilidad: si el navegador es antiguo y algo falla, se muestra un aviso en vez de una pantalla en blanco.
+window.addEventListener("error", function () {
+  var m = document.getElementById("stateMsg");
+  if (m && document.getElementById("content").style.display !== "block") {
+    m.style.display = "block";
+    m.textContent = "Este navegador no pudo cargar el dashboard. Actualice el navegador o use Google Chrome o Microsoft Edge actualizados.";
+  }
+});
+// Ventanas emergentes: usan <dialog> si el navegador lo soporta; si no, se muestran como capa fija.
+function abrirDialogo(d){
+  if (typeof d.showModal === "function") { d.showModal(); return; }
+  d.setAttribute("open", ""); d.style.position = "fixed"; d.style.top = "50%"; d.style.left = "50%";
+  d.style.transform = "translate(-50%, -50%)"; d.style.zIndex = "1000"; d.style.maxHeight = "90vh"; d.style.overflow = "auto";
+  document.body.style.overflow = "hidden";
+}
+function cerrarDialogo(d){
+  if (typeof d.close === "function" && typeof d.showModal === "function") { d.close(); return; }
+  d.removeAttribute("open"); document.body.style.overflow = "";
+}
 const APPS_SCRIPT_URL = API_URL;
 
 const NOMBRES_EVENTO = { transicion: "Transición", quinto: "Quinto", undecimo: "Undécimo" };
@@ -1373,7 +1393,7 @@ $("nGrado").addEventListener("change", () => {
 function normalizarDoc(v){ return v.toUpperCase().replace(/[\s.\-]/g, ""); }
 function normalizarNombre(v){
   return v.trim().replace(/\s+/g, " ").toLowerCase()
-    .replace(/(^|\s)(\p{L})/gu, (m, sp, l) => sp + l.toUpperCase());
+    .replace(/(^|\s)(\S)/g, (m, sp, l) => sp + l.toUpperCase());
 }
 
 function limpiarFormulario(){
@@ -1387,11 +1407,11 @@ function limpiarFormulario(){
 function abrirAgregar(){
   if (!PUEDE_AGREGAR || !inscripcionesAbiertas()) return;
   limpiarFormulario();
-  dlg.showModal();
+  abrirDialogo(dlg);
   $("nDoc").focus();
 }
 function cerrarAgregar(){
-  dlg.close();
+  cerrarDialogo(dlg);
   const fila = document.getElementById("filaRecien");
   if (fila) {
     fila.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1418,7 +1438,7 @@ function validar(){
 
   let eNom = "";
   if (!nombre) eNom = "Escriba el nombre completo.";
-  else if (!/^[\p{L}' ]+$/u.test(nombre)) eNom = "El nombre solo puede tener letras y espacios.";
+  else if (!/^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ' ]+$/.test(nombre)) eNom = "El nombre solo puede tener letras y espacios.";
   else if (nombre.split(" ").length < 2) eNom = "Escriba al menos un nombre y un apellido.";
   $("errNombre").textContent = eNom; $("nNombre").setAttribute("aria-invalid", eNom ? "true" : "false");
   if (eNom) ok = false;
@@ -1521,7 +1541,7 @@ async function abrirSoporte(doc, boton){
   document.getElementById("sopVisor").innerHTML = '<span class="sop-cargando">Cargando soporte…</span>';
   document.getElementById("sopError").style.display = "none";
   document.getElementById("sopAbrir").hidden = true;
-  dlgSop.showModal();
+  abrirDialogo(dlgSop);
 
   try {
     if (BACKEND_CONECTADO) {
@@ -1577,7 +1597,7 @@ function mostrarArchivoSoporte(i){
 }
 
 function cerrarSoporte(){
-  dlgSop.close();
+  cerrarDialogo(dlgSop);
   SOP_URLS.forEach(u => URL.revokeObjectURL(u)); SOP_URLS = []; SOP_ARCHIVOS = [];
   if (SOP_BOTON) SOP_BOTON.focus();
 }
@@ -1612,7 +1632,7 @@ function abrirAbonos(doc, boton){
   document.getElementById("abValor").value = "";
   document.getElementById("abErr").textContent = "";
   pintarAbonos();
-  dlgAb.showModal();
+  abrirDialogo(dlgAb);
   const inp = document.getElementById("abValor");
   if (!document.getElementById("abForm").hidden) inp.focus(); else document.getElementById("abListo").focus();
 }
@@ -1723,7 +1743,7 @@ function refrescarTrasAbono(){
   if (document.getElementById("verifDoc").value.trim()) verificarEnPuerta();
 }
 
-function cerrarAbonos(){ dlgAb.close(); if (AB_BOTON && document.body.contains(AB_BOTON)) AB_BOTON.focus(); }
+function cerrarAbonos(){ cerrarDialogo(dlgAb); if (AB_BOTON && document.body.contains(AB_BOTON)) AB_BOTON.focus(); }
 document.getElementById("abCerrar").addEventListener("click", cerrarAbonos);
 document.getElementById("abListo").addEventListener("click", cerrarAbonos);
 dlgAb.addEventListener("cancel", e => { e.preventDefault(); cerrarAbonos(); });
