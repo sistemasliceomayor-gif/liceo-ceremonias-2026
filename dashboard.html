@@ -448,6 +448,21 @@
   .ab-barra{height:9px;border-radius:5px;background:var(--crema-2);overflow:hidden;margin-bottom:16px;}
   .ab-barra i{display:block;height:100%;background:var(--marron);border-radius:5px;}
   .ab-barra.paz i{background:var(--verde-700);}
+  .ab-barra{display:flex;} .ab-barra em{display:block;height:100%;background:repeating-linear-gradient(45deg,#F2D48A 0 6px,#d9b45f 6px 12px);}
+  .ab-resumen.cuatro{grid-template-columns:repeat(4,1fr);}
+  @media (max-width:480px){ .ab-resumen.cuatro{grid-template-columns:1fr 1fr;} }
+  .ab-resumen .co b{color:var(--marron);}
+  .ab-lista li.cond{border-color:#d9c2a6;background:#fbf6ef;}
+  .pill.condon{background:#f3e6d6;color:#6b4420;font-size:10.5px;vertical-align:middle;}
+  .btn-cond{font-family:inherit;font-weight:700;font-size:14px;border-radius:10px;padding:10px 16px;cursor:pointer;background:#fff;color:var(--marron);border:2px solid var(--marron);}
+  .btn-cond:hover:not(:disabled){background:#fbf3e3;} .btn-cond:disabled{opacity:.5;cursor:not-allowed;}
+  .btn-cond:focus-visible{outline:3px solid var(--dorado);outline-offset:2px;}
+  #abConfCond{margin-top:10px;background:#fbf3e3;border:1px solid #e6cfa8;border-radius:9px;padding:9px 10px;color:#6b4420;}
+  #abConfCond[hidden]{display:none;}
+  #abConfCond .si{background:var(--marron);border-color:var(--marron);color:#fff;} #abConfCond .no{background:#fff;border-color:var(--marron);color:#6b4420;}
+  .pago-cond{display:block;font-size:11px;font-weight:600;color:var(--marron);}
+  .rec-kpi.cond .n{color:var(--marron);}
+  .rec-cond-nivel{font-size:12px;color:#6b4420;background:#fbf3e3;border-radius:8px;padding:6px 10px;margin:-2px 0 8px;}
   .ab-lista{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:6px;max-height:210px;overflow:auto;}
   .ab-lista li{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid var(--crema-2);border-radius:9px;padding:8px 10px;font-size:13px;flex-wrap:wrap;}
   .ab-lista li b{font-size:14px;}
@@ -560,7 +575,7 @@
 
     <section class="recaudo-wrap" aria-labelledby="recTitulo">
       <h3 id="recTitulo">Recaudo por derechos de grado</h3>
-      <p class="recaudo-nota">Proyección calculada con los estudiantes de la base (incluye los agregados manualmente) y el valor del derecho de cada nivel. El recaudo corresponde a los abonos registrados por Secretaría Académica a partir de sus recibos de caja menor.</p>
+      <p class="recaudo-nota">Proyección calculada con los estudiantes de la base (incluye los agregados manualmente) y el valor del derecho de cada nivel. El recaudo corresponde a los abonos en dinero registrados a partir de los recibos de caja menor. Las condonaciones autorizadas por Rectoría se muestran aparte: cuentan para el paz y salvo, pero no son dinero recaudado. Proyección = Recaudado + Condonado + Por recaudar.</p>
       <div class="rec-kpis" id="recKpis"></div>
       <div class="rec-grid">
         <div class="rec-dona">
@@ -712,14 +727,16 @@
     <p class="ab-meta" id="abMeta"></p>
     <div class="ab-resumen" id="abResumen"></div>
     <div class="ab-estado"><span id="abEstadoTxt"></span><span id="abPct"></span></div>
-    <div class="ab-barra" id="abBarra"><i></i></div>
+    <div class="ab-barra" id="abBarra"><i></i><em></em></div>
     <div id="abHistorial"></div>
     <div class="ab-form" id="abForm">
       <label for="abValor">Valor del abono</label>
       <div class="ab-fila">
         <div class="campo-pesos"><span aria-hidden="true">$</span><input type="text" id="abValor" inputmode="numeric" pattern="[0-9.]*" autocomplete="off" placeholder="0" aria-describedby="abAyuda abErr"></div>
         <button type="button" class="btn" id="abGuardar">Registrar abono</button>
+        <button type="button" class="btn-cond" id="abCondonar" hidden>Condonar saldo</button>
       </div>
+      <div class="ab-conf ab-conf-cond" id="abConfCond" hidden><span></span><button type="button" class="si" id="abConfCondSi">Sí, condonar</button><button type="button" class="no" id="abConfCondNo">No</button></div>
       <div class="ab-ayuda" id="abAyuda"></div>
       <div class="ab-err" id="abErr" role="alert"></div>
     </div>
@@ -790,9 +807,12 @@ function salirPorSesion(msg){
 }
 const esErrorDeSesion = e => /sesión expiró|clave de su perfil cambió/i.test(e && e.message || "");
 
-const LABEL_AREA = { admin: "Administración", secretaria: "Secretaría Académica", coordinaciones: "Coordinaciones", trabajo_social: "Trabajo Social" };
-// Registran y anulan abonos: Secretaría Académica (encargada de los dineros) y Administración.
-const PUEDE_ABONAR = area === "secretaria" || area === "admin";
+const LABEL_AREA = { admin: "Administración", rectoria: "Rectoría", secretaria: "Secretaría Académica", coordinaciones: "Coordinaciones", trabajo_social: "Trabajo Social" };
+// Registran y anulan abonos: Secretaría Académica (encargada de los dineros), Rectoría y Administración.
+const PUEDE_ABONAR = area === "secretaria" || area === "admin" || area === "rectoria";
+// Condonación de saldo autorizada (bonos): solo Rectoría y Administración.
+const PUEDE_CONDONAR = area === "admin" || area === "rectoria";
+const esCond = a => a.tipo === "condonacion";
 document.getElementById("areaLabel").textContent = LABEL_AREA[area] || area;
 document.getElementById("logoutBtn").addEventListener("click", () => {
   api("cerrarSesion", { token }).catch(() => {});
@@ -865,10 +885,13 @@ function aplicarAbonos(){
     const lista = porDoc[String(f.documento)] || [];
     const activos = lista.filter(a => !a.anulado);
     f.abonos = lista;
-    f.totalAbonado = activos.reduce((t, a) => t + (Number(a.valor) || 0), 0);
+    // totalAbonado = dinero recibido; totalCondonado = bonos autorizados por Rectoría (no es recaudo).
+    f.totalAbonado = activos.filter(a => !esCond(a)).reduce((t, a) => t + (Number(a.valor) || 0), 0);
+    f.totalCondonado = activos.filter(esCond).reduce((t, a) => t + (Number(a.valor) || 0), 0);
     f.totalPagado = f.totalAbonado;
-    f.saldo = Math.max(0, f.valorDerecho - f.totalAbonado);
-    f.estadoPago = f.valorDerecho && f.totalAbonado >= f.valorDerecho ? "paz" : f.totalAbonado > 0 ? "parcial" : "sin";
+    f.totalCubierto = f.totalAbonado + f.totalCondonado;
+    f.saldo = Math.max(0, f.valorDerecho - f.totalCubierto);
+    f.estadoPago = f.valorDerecho && f.totalCubierto >= f.valorDerecho ? "paz" : f.totalCubierto > 0 ? "parcial" : "sin";
   });
 }
 function pillPago(f){
@@ -1131,23 +1154,27 @@ function textoCorto(f){
 function renderRecaudo(){
   const niveles = Object.keys(NOMBRES_EVENTO).map(ev => {
     const filas = FILAS.filter(f => f.evento === ev);
-    const pagaron = filas.filter(f => f.totalAbonado > 0);
+    const pagaron = filas.filter(f => f.totalCubierto > 0);
     const paz = filas.filter(f => f.estadoPago === "paz").length;
     const parcial = filas.filter(f => f.estadoPago === "parcial").length;
-    const nAbonos = filas.reduce((t, f) => t + f.abonos.filter(a => !a.anulado).length, 0);
+    const nAbonos = filas.reduce((t, f) => t + f.abonos.filter(a => !a.anulado && !esCond(a)).length, 0);
+    const nCond = filas.filter(f => f.totalCondonado > 0).length;
+    const condonado = filas.reduce((t, f) => t + f.totalCondonado, 0);
     const proyectado = filas.reduce((t, f) => t + f.valorDerecho, 0);
     const recaudado = pagaron.reduce((t, f) => t + f.totalPagado, 0);
     const manuales = filas.filter(f => f.origen === "manual").length;
     return { ev, nombre: NOMBRES_EVENTO[ev], valor: VALOR_DERECHO[ev], estudiantes: filas.length, manuales,
-             pagaron: pagaron.length, paz, parcial, nAbonos, proyectado, recaudado, pendiente: Math.max(0, proyectado - recaudado),
-             pct: proyectado ? recaudado / proyectado * 100 : 0 };
+             pagaron: pagaron.length, paz, parcial, nAbonos, nCond, proyectado, recaudado, condonado,
+             pendiente: Math.max(0, proyectado - recaudado - condonado),
+             pct: proyectado - condonado > 0 ? recaudado / (proyectado - condonado) * 100 : 0 };
   });
   const T = niveles.reduce((a, n) => ({ proyectado: a.proyectado + n.proyectado, recaudado: a.recaudado + n.recaudado,
+    condonado: a.condonado + n.condonado, nCond: a.nCond + n.nCond,
     estudiantes: a.estudiantes + n.estudiantes, pagaron: a.pagaron + n.pagaron, manuales: a.manuales + n.manuales,
     paz: a.paz + n.paz, parcial: a.parcial + n.parcial, nAbonos: a.nAbonos + n.nAbonos }),
-    { proyectado: 0, recaudado: 0, estudiantes: 0, pagaron: 0, manuales: 0, paz: 0, parcial: 0, nAbonos: 0 });
-  T.pendiente = Math.max(0, T.proyectado - T.recaudado);
-  T.pct = T.proyectado ? T.recaudado / T.proyectado * 100 : 0;
+    { proyectado: 0, recaudado: 0, condonado: 0, nCond: 0, estudiantes: 0, pagaron: 0, manuales: 0, paz: 0, parcial: 0, nAbonos: 0 });
+  T.pendiente = Math.max(0, T.proyectado - T.recaudado - T.condonado);
+  T.pct = T.proyectado - T.condonado > 0 ? T.recaudado / (T.proyectado - T.condonado) * 100 : 0;
   const pctTxt = p => (p > 0 && p < 1 ? p.toFixed(1).replace(".", ",") : Math.round(p)) + "%";
 
   document.getElementById("recKpis").innerHTML = `
@@ -1156,7 +1183,9 @@ function renderRecaudo(){
     <div class="rec-kpi"><div class="n">${pesos(T.recaudado)}</div><div class="l">Recaudado</div>
       <div class="s">${T.nAbonos} abono${T.nAbonos === 1 ? "" : "s"} de ${T.pagaron} estudiante${T.pagaron === 1 ? "" : "s"}</div></div>
     <div class="rec-kpi"><div class="n">${pctTxt(T.pct)}</div><div class="l">Porcentaje de recaudo</div>
-      <div class="s">Sobre la proyección total</div></div>
+      <div class="s">${T.condonado ? "Sobre lo cobrable (proyección menos condonaciones)" : "Sobre la proyección total"}</div></div>
+    <div class="rec-kpi cond"><div class="n">${pesos(T.condonado)}</div><div class="l">Condonado por Rectoría</div>
+      <div class="s">${T.nCond} estudiante${T.nCond === 1 ? "" : "s"} con condonación · no es dinero recaudado</div></div>
     <div class="rec-kpi pend"><div class="n">${pesos(T.pendiente)}</div><div class="l">Por recaudar</div>
       <div class="s">${T.paz} a paz y salvo · ${T.parcial} con abono parcial · ${T.estudiantes - T.pagaron} sin abonos</div></div>`;
 
@@ -1167,7 +1196,7 @@ function renderRecaudo(){
         <div>Proyectado<b>${pesos(n.proyectado)}</b></div>
         <div class="ok">Recaudado<b>${pesos(n.recaudado)}</b></div>
         <div class="pe">Por recaudar<b>${pesos(n.pendiente)}</b></div>
-      </div>
+      </div>${n.condonado ? `<div class="rec-cond-nivel">Condonado por Rectoría: <b>${pesos(n.condonado)}</b> (${n.nCond} estudiante${n.nCond === 1 ? "" : "s"})</div>` : ""}
       <div class="rec-barra"><div class="bar-bg"><div class="bar-fill" style="width:${Math.min(100, n.pct)}%"></div></div><span>${pctTxt(n.pct)}</span></div>
       <div class="rec-nivel-head" style="margin-top:8px;"><span>Paz y salvo: ${n.paz} · Abono parcial: ${n.parcial} · Sin abonos: ${n.estudiantes - n.pagaron}</span></div>
     </div>`).join("");
@@ -1177,7 +1206,7 @@ function renderRecaudo(){
     if (CHARTS.chartRecaudo) CHARTS.chartRecaudo.destroy();
     CHARTS.chartRecaudo = new Chart(document.getElementById("chartRecaudo"), {
       type: "doughnut",
-      data: { labels: ["Recaudado", "Por recaudar"], datasets: [{ data: [T.recaudado, T.pendiente], backgroundColor: ["#0D6B3E", "#F1EADA"], borderWidth: 0 }] },
+      data: { labels: ["Recaudado", "Condonado", "Por recaudar"], datasets: [{ data: [T.recaudado, T.condonado, T.pendiente], backgroundColor: ["#0D6B3E", "#8A5A2B", "#F1EADA"], borderWidth: 0 }] },
       options: { responsive: true, maintainAspectRatio: false, cutout: "62%",
         plugins: { legend: { position: "bottom", labels: { font: { family: "Montserrat", size: 11 }, boxWidth: 12, padding: 10 } },
                    tooltip: { callbacks: { label: c => c.label + ": " + pesos(c.raw) } } } }
@@ -1190,7 +1219,8 @@ function renderRecaudo(){
       data: { labels: niveles.map(n => n.nombre),
         datasets: [
           { label: "Proyectado", data: niveles.map(n => n.proyectado), backgroundColor: "#F2D48A", borderRadius: 6 },
-          { label: "Recaudado", data: niveles.map(n => n.recaudado), backgroundColor: "#0D6B3E", borderRadius: 6 }
+          { label: "Recaudado", data: niveles.map(n => n.recaudado), backgroundColor: "#0D6B3E", borderRadius: 6 },
+          { label: "Condonado", data: niveles.map(n => n.condonado), backgroundColor: "#8A5A2B", borderRadius: 6 }
         ] },
       options: { responsive: true, maintainAspectRatio: false, indexAxis: "y",
         scales: { x: { ticks: { callback: v => "$" + (v / 1000000).toLocaleString("es-CO") + " M", font: { family: "Montserrat", size: 11 } }, grid: { color: "#F1EADA" } },
@@ -1256,7 +1286,7 @@ function render(){
       <td><span class="grado-pill">${NOMBRES_EVENTO[f.evento] || f.evento}</span></td>
       <td>${f.grupo || "—"}</td>
       <td><div class="pago-cel">${pillPago(f)}${PUEDE_ABONAR ? `<button type="button" class="btn-abono" data-doc="${esc(f.documento)}" aria-label="Abonos de ${esc(f.nombre)}">${f.estadoPago === "paz" ? "Ver abonos" : "+ Abono"}</button>` : ""}</div>${f.estadoPago === "parcial" ? `<span class="pago-saldo">Falta ${pesos(f.saldo)}</span>` : ""}</td>
-      <td class="valor">${f.totalAbonado ? pesos(f.totalAbonado) : "—"}</td>
+      <td class="valor">${f.totalAbonado ? pesos(f.totalAbonado) : "—"}${f.totalCondonado ? `<span class="pago-cond">+ ${pesos(f.totalCondonado)} condonado</span>` : ""}</td>
       <td>${f.acompanante1 ? f.acompanante1 + " (Doc. " + (f.acompanante1Doc || "—") + ")" : "—"}</td>
       <td>${f.acompanante2 ? f.acompanante2 + " (Doc. " + (f.acompanante2Doc || "—") + ")" : "—"}</td>
       <td>${f.telefono ? f.telefono + (f.correo ? " · " + f.correo : "") : "—"}</td>
@@ -1277,7 +1307,7 @@ document.getElementById("buscar").addEventListener("input", render);
 document.getElementById("exportBtn").addEventListener("click", () => {
   const filtradas = filtrarFilas();
 
-  const headers = ["Estado","Origen del registro","Agregado por","Fecha en que se agregó","Observación del agregado","Documento","Estudiante","Jornada","Grado","Grupo","Acompañante 1","Documento Acompañante 1","Acompañante 2","Documento Acompañante 2","Teléfono","Correo","Constancia descargada","Asistencia confirmada","Fecha inscripción","Valor derecho a grado","Total abonado","Saldo pendiente","Estado de pago","Número de abonos"];
+  const headers = ["Estado","Origen del registro","Agregado por","Fecha en que se agregó","Observación del agregado","Documento","Estudiante","Jornada","Grado","Grupo","Acompañante 1","Documento Acompañante 1","Acompañante 2","Documento Acompañante 2","Teléfono","Correo","Constancia descargada","Asistencia confirmada","Fecha inscripción","Valor derecho a grado","Total abonado","Total condonado (Rectoría)","Saldo pendiente","Estado de pago","Número de abonos"];
   const filas = filtradas.map(f => ([
     f.inscrito ? "Inscrito" : "Pendiente",
     f.origen === "manual" ? "Agregado manualmente" : "Base inicial",
@@ -1300,9 +1330,10 @@ document.getElementById("exportBtn").addEventListener("click", () => {
     f.fechaRegistro ? new Date(f.fechaRegistro).toLocaleString("es-CO") : "",
     f.valorDerecho,
     f.totalAbonado,
+    f.totalCondonado,
     f.saldo,
     f.estadoPago === "paz" ? "Paz y salvo" : f.estadoPago === "parcial" ? "Abono parcial" : "Sin abonos",
-    f.abonos.filter(a => !a.anulado).length
+    f.abonos.filter(a => !a.anulado && !esCond(a)).length
   ]));
 
   const wsData = [headers, ...filas];
@@ -1311,7 +1342,7 @@ document.getElementById("exportBtn").addEventListener("click", () => {
   ws["!cols"] = [
     { wch: 11 }, { wch: 20 }, { wch: 16 }, { wch: 20 }, { wch: 36 }, { wch: 14 }, { wch: 28 }, { wch: 10 }, { wch: 12 }, { wch: 8 },
     { wch: 20 }, { wch: 16 }, { wch: 20 }, { wch: 16 }, { wch: 13 }, { wch: 26 },
-    { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 12 }
+    { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 16 }, { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 12 }
   ];
   ws["!autofilter"] = { ref: `A1:${XLSX.utils.encode_col(headers.length - 1)}${filas.length + 1}` };
 
@@ -1336,7 +1367,7 @@ document.getElementById("exportBtn").addEventListener("click", () => {
 // Cierre de inscripciones: 15 de octubre de 2026, 11:59 p. m. hora de Colombia.
 // El Apps Script debe aplicar la misma regla; esta es solo la validación visible.
 let FECHA_CIERRE = new Date("2026-10-31T23:59:59-05:00"); // se actualiza con la pestaña "Configuración"
-const PUEDE_AGREGAR = area === "admin";
+const PUEDE_AGREGAR = area === "admin" || area === "rectoria";
 
 function esc(t){
   return String(t == null ? "" : t).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
@@ -1610,8 +1641,10 @@ function htmlPagoEntrada(f){
   // Acceso rápido a los abonos: solo Secretaría Académica y Administración.
   const boton = !PUEDE_ABONAR ? ""
     : `<button type="button" class="btn-abono" id="btnAbonoEntrada" aria-label="${f.estadoPago === "paz" ? "Ver abonos" : "Registrar abono"} de ${esc(f.nombre)}">${f.estadoPago === "paz" ? "Ver abonos" : "+ Registrar abono"}</button>`;
-  if (f.estadoPago === "paz") return `<div class="verif-pago paz"><span>✓ Paz y salvo<small>Derecho a grado ${pesos(f.valorDerecho)} pagado${f.abonos.filter(a => !a.anulado).length > 1 ? " en " + f.abonos.filter(a => !a.anulado).length + " abonos" : ""}</small></span>${boton}</div>`;
-  return `<div class="verif-pago debe"><span>✕ Saldo pendiente: ${pesos(f.saldo)}<small>Abonado ${pesos(f.totalAbonado)} de ${pesos(f.valorDerecho)}. No debe permitirse el ingreso hasta estar a paz y salvo.</small></span>${boton}</div>`;
+  const nAb = f.abonos.filter(a => !a.anulado && !esCond(a)).length;
+  const txtCond = f.totalCondonado ? ` (incluye ${pesos(f.totalCondonado)} condonado por Rectoría)` : "";
+  if (f.estadoPago === "paz") return `<div class="verif-pago paz"><span>✓ Paz y salvo<small>Derecho a grado ${pesos(f.valorDerecho)} cubierto${nAb > 1 ? " en " + nAb + " abonos" : ""}${txtCond}</small></span>${boton}</div>`;
+  return `<div class="verif-pago debe"><span>✕ Saldo pendiente: ${pesos(f.saldo)}<small>Abonado ${pesos(f.totalAbonado)} de ${pesos(f.valorDerecho)}${txtCond}. No debe permitirse el ingreso hasta estar a paz y salvo.</small></span>${boton}</div>`;
 }
 function activarBotonAbonoEntrada(f){
   const b = document.getElementById("btnAbonoEntrada");
@@ -1645,13 +1678,17 @@ function pintarAbonos(){
   document.getElementById("abResumen").innerHTML = `
     <div>Derecho a grado<b>${pesos(f.valorDerecho)}</b></div>
     <div class="ok">Abonado<b>${pesos(f.totalAbonado)}</b></div>
+    ${f.totalCondonado ? `<div class="co">Condonado<b>${pesos(f.totalCondonado)}</b></div>` : ""}
     <div class="pe">Saldo<b>${pesos(f.saldo)}</b></div>`;
-  const pct = f.valorDerecho ? Math.min(100, f.totalAbonado / f.valorDerecho * 100) : 0;
+  document.getElementById("abResumen").classList.toggle("cuatro", !!f.totalCondonado);
+  const pct = f.valorDerecho ? Math.min(100, f.totalCubierto / f.valorDerecho * 100) : 0;
   document.getElementById("abEstadoTxt").innerHTML = pillPago(f);
   document.getElementById("abPct").textContent = Math.round(pct) + "%";
   const barra = document.getElementById("abBarra");
   barra.classList.toggle("paz", f.estadoPago === "paz");
-  barra.querySelector("i").style.width = pct + "%";
+  const pctAb = f.valorDerecho ? Math.min(100, f.totalAbonado / f.valorDerecho * 100) : 0;
+  barra.querySelector("i").style.width = pctAb + "%";
+  barra.querySelector("em").style.width = Math.max(0, pct - pctAb) + "%";
 
   const lista = [...f.abonos].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
   const hist = document.getElementById("abHistorial");
@@ -1662,15 +1699,16 @@ function pintarAbonos(){
     lista.forEach(a => {
       const li = document.createElement("li");
       if (a.anulado) li.className = "anulado";
-      li.innerHTML = `<div><b>${pesos(a.valor)}</b><small>${fmtFecha(a.fecha)} · ${esc(LABEL_AREA[a.registradoPor] || a.registradoPor || "")}</small>`
+      if (esCond(a)) li.classList.add("cond");
+      li.innerHTML = `<div><b>${pesos(a.valor)}</b>${esCond(a) ? ' <span class="pill condon">Condonación autorizada</span>' : ""}<small>${fmtFecha(a.fecha)} · ${esc(LABEL_AREA[a.registradoPor] || a.registradoPor || "")}</small>`
         + (a.anulado ? `<small class="an">Anulado por ${esc(LABEL_AREA[a.anuladoPor] || a.anuladoPor || "")} · ${fmtFecha(a.fechaAnulacion)}</small>` : "") + `</div>`;
-      if (!a.anulado && PUEDE_ABONAR) {
+      if (!a.anulado && (esCond(a) ? PUEDE_CONDONAR : PUEDE_ABONAR)) {
         const cont = document.createElement("div");
         const btn = document.createElement("button");
         btn.type = "button"; btn.className = "ab-anular"; btn.textContent = "Anular";
-        btn.setAttribute("aria-label", "Anular abono de " + pesos(a.valor));
+        btn.setAttribute("aria-label", (esCond(a) ? "Anular condonación de " : "Anular abono de ") + pesos(a.valor));
         btn.addEventListener("click", () => {
-          cont.innerHTML = `<div class="ab-conf"><span>¿Anular este abono?</span><button type="button" class="si">Sí, anular</button><button type="button" class="no">No</button></div>`;
+          cont.innerHTML = `<div class="ab-conf"><span>¿Anular ${esCond(a) ? "esta condonación" : "este abono"}?</span><button type="button" class="si">Sí, anular</button><button type="button" class="no">No</button></div>`;
           cont.querySelector(".no").addEventListener("click", pintarAbonos);
           cont.querySelector(".si").addEventListener("click", () => anularAbono(a));
           cont.querySelector(".no").focus();
@@ -1684,6 +1722,9 @@ function pintarAbonos(){
   const form = document.getElementById("abForm");
   form.hidden = !PUEDE_ABONAR;
   const inp = document.getElementById("abValor"), btn = document.getElementById("abGuardar");
+  const btnC = document.getElementById("abCondonar");
+  btnC.hidden = !PUEDE_CONDONAR; btnC.disabled = f.estadoPago === "paz"; btnC.textContent = "Condonar saldo";
+  document.getElementById("abConfCond").hidden = true;
   form.querySelector("label").hidden = f.estadoPago === "paz";
   form.querySelector(".ab-fila").hidden = f.estadoPago === "paz";
   if (f.estadoPago === "paz") {
@@ -1691,7 +1732,8 @@ function pintarAbonos(){
     document.getElementById("abAyuda").innerHTML = '<span class="ab-paz">✓ El estudiante está a paz y salvo. No admite más abonos.</span>';
   } else {
     inp.disabled = false; btn.disabled = false;
-    document.getElementById("abAyuda").textContent = `Máximo ${pesos(f.saldo)} (saldo pendiente).`;
+    document.getElementById("abAyuda").textContent = `Máximo ${pesos(f.saldo)} (saldo pendiente).`
+      + (PUEDE_CONDONAR ? " Use «Condonar saldo» solo para bonos autorizados por Rectoría: no suma al recaudo." : "");
   }
 }
 
@@ -1726,6 +1768,43 @@ async function registrarAbono(){
     if (!inp.disabled) inp.focus();
   } catch (e) { err.textContent = e.message || "No se pudo conectar con el servidor."; }
   finally { btn.textContent = "Registrar abono"; pintarAbonos(); }
+}
+
+// ----- Condonación de saldo autorizada (solo Rectoría y Administración), con confirmación -----
+document.getElementById("abCondonar").addEventListener("click", () => {
+  if (!PUEDE_CONDONAR) return;
+  const f = FILAS.find(x => String(x.documento) === AB_DOC);
+  const err = document.getElementById("abErr"), inp = document.getElementById("abValor");
+  const valor = parseInt(inp.value.replace(/\D/g, "") || "0", 10);
+  if (!valor) { err.textContent = "Escriba el valor a condonar."; inp.focus(); return; }
+  if (valor > f.saldo) { err.textContent = `La condonación supera el saldo pendiente (${pesos(f.saldo)}).`; inp.focus(); return; }
+  const conf = document.getElementById("abConfCond");
+  conf.querySelector("span").textContent = `¿Condonar ${pesos(valor)} del saldo de ${f.nombre}? Quedará registrado a nombre de ${LABEL_AREA[area]}.`;
+  conf.hidden = false;
+  document.getElementById("abConfCondSi").focus();
+});
+document.getElementById("abConfCondNo").addEventListener("click", () => {
+  document.getElementById("abConfCond").hidden = true; document.getElementById("abCondonar").focus();
+});
+document.getElementById("abConfCondSi").addEventListener("click", registrarCondonacion);
+
+async function registrarCondonacion(){
+  if (!PUEDE_CONDONAR) return;
+  const f = FILAS.find(x => String(x.documento) === AB_DOC);
+  const err = document.getElementById("abErr"), inp = document.getElementById("abValor"), btn = document.getElementById("abCondonar");
+  const valor = parseInt(inp.value.replace(/\D/g, "") || "0", 10);
+  document.getElementById("abConfCond").hidden = true;
+  if (!valor || valor > f.saldo) return;
+  btn.disabled = true; btn.textContent = "Guardando…";
+  try {
+    let nuevo;
+    if (BACKEND_CONECTADO) nuevo = (await llamarBackend({ action: "registrarCondonacion", documento: f.documento, valor })).abono;
+    else nuevo = { id: "C" + Date.now(), documento: String(f.documento), valor, fecha: new Date().toISOString(), registradoPor: area, anulado: false, tipo: "condonacion" };
+    ABONOS.push(nuevo);
+    inp.value = "";
+    refrescarTrasAbono();
+  } catch (e) { err.textContent = e.message || "No se pudo conectar con el servidor."; }
+  finally { pintarAbonos(); }
 }
 
 async function anularAbono(a){

@@ -657,15 +657,16 @@ const CEREMONIAS = {
                 lugar: "Gran salón Comfamiliar sede Norte Barranquilla", direccion: "Calle 79B # 42-650" },
   quinto:     { valor: 250000, fecha: "Miércoles 2 de diciembre de 2026", horas: { "Mañana": "7:30 a. m.", "Tarde": "9:30 a. m." },
                 lugar: "Gran salón Comfamiliar sede Norte Barranquilla", direccion: "Calle 79B # 42-650" },
-  undecimo:   { valor: 420000, fecha: "Miércoles 9 de diciembre de 2026", horas: { "Tarde": "3:00 p. m." },
+  undecimo:   { valor: 420000, fecha: "Miércoles 9 de diciembre de 2026", horaUnica: "3:00 p. m.", horas: {},
                 lugar: "Gran salón Hotel Country International", direccion: "Carrera 52 # 75-30" }
 };
 
 function bloqueCeremonia(doc, d, y, W){
   const c = CEREMONIAS[d.evento];
   if (!c) return y;
-  const jor = d.jornada && c.horas[d.jornada] ? d.jornada : null;
-  const hora = jor ? c.horas[jor] : Object.entries(c.horas).map(([j, h]) => j + " " + h).join("  ·  ");
+  // Undécimo tiene una sola hora para todos; Transición y Quinto dependen de la jornada del estudiante.
+  const jor = !c.horaUnica && d.jornada && c.horas[d.jornada] ? d.jornada : null;
+  const hora = c.horaUnica ? c.horaUnica : jor ? c.horas[jor] : Object.entries(c.horas).map(([j, h]) => j + " " + h).join("  ·  ");
   const alto = 84;
   doc.setFillColor(226,240,231); doc.setDrawColor(13,107,62); doc.setLineWidth(1.2);
   doc.roundedRect(40, y, W-80, alto, 8, 8, "FD");
